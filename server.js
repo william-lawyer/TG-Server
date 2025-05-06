@@ -40,7 +40,13 @@ app.post('/order', async (req, res) => {
       photo
     } = req.body;
 
-    console.log('Received order:', id, firstName, lastName);
+    console.log('Received order:', { id, firstName, lastName, passport, phone, discord, amount, items });
+
+    // Проверка валидности ID заказа
+    if (!id || !id.startsWith('#') || id.length !== 5) {
+      console.error('Invalid order ID:', id);
+      return res.status(400).json({ error: 'Неверный формат ID заказа' });
+    }
 
     // Формирование сообщения для Telegram
     const itemList = items.map(item => `${item.name} - ${item.price} ₽ x ${item.quantity}`).join('\n');
@@ -76,11 +82,12 @@ ${itemList}
     // Сохранение статуса заказа
     orderStatuses[id] = { status: 'pending', data: { firstName, lastName, passport, phone, discord, amount, items } };
     console.log('Order status saved:', id, orderStatuses[id]);
+    console.log('Current orderStatuses:', Object.keys(orderStatuses));
 
     res.status(200).json({ orderId: id });
   } catch (error) {
     console.error('Error processing order:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    res.status(500).json({ error: 'Ошибка сервера при обработке заказа' });
   }
 });
 
@@ -93,7 +100,7 @@ app.get('/status/:orderId', (req, res) => {
     console.log('Returning status:', status);
     res.status(200).json(status);
   } else {
-    console.log('Order not found:', orderId);
+    console.log('Order not found:', orderId, 'Available orders:', Object.keys(orderStatuses));
     res.status(404).json({ status: 'pending', error: 'Order not found' });
   }
 });
@@ -132,15 +139,19 @@ bot.command('approve', async (ctx) => {
 
   let orderId = ctx.message.text.split(' ')[1];
   if (orderId) {
-    orderId = orderId.trim().replace(/^#/, ''); // Удаляем # и пробелы
+    orderId = orderId.trim();
+    // Приводим ID к стандартному формату (#XXXX)
+    if (!orderId.startsWith('#')) {
+      orderId = `#${orderId}`;
+    }
     console.log('Parsed orderId:', orderId);
-    if (orderStatuses[`#${orderId}`]) {
-      orderStatuses[`#${orderId}`].status = 'approved';
-      console.log('Bot approved order:', `#${orderId}`);
-      await ctx.reply(`Заказ #${orderId} подтвержден`);
+    if (orderStatuses[orderId]) {
+      orderStatuses[orderId].status = 'approved';
+      console.log('Bot approved order:', orderId, orderStatuses[orderId]);
+      await ctx.reply(`Заказ ${orderId} подтвержден`);
     } else {
-      console.log('Order not found:', `#${orderId}`, 'Available orders:', Object.keys(orderStatuses));
-      await ctx.reply(`Заказ #${orderId} не найден. Доступные заказы: ${Object.keys(orderStatuses).join(', ')}`);
+      console.log('Order not found:', orderId, 'Available orders:', Object.keys(orderStatuses));
+      await ctx.reply(`Заказ ${orderId} не найден. Доступные заказы: ${Object.keys(orderStatuses).join(', ')}`);
     }
   } else {
     console.log('Missing orderId');
@@ -159,15 +170,19 @@ bot.command('reject', async (ctx) => {
 
   let orderId = ctx.message.text.split(' ')[1];
   if (orderId) {
-    orderId = orderId.trim().replace(/^#/, ''); // Удаляем # и пробелы
+    orderId = orderId.trim();
+    // Приводим ID к стандартному формату (#XXXX)
+    if (!orderId.startsWith('#')) {
+      orderId = `#${orderId}`;
+    }
     console.log('Parsed orderId:', orderId);
-    if (orderStatuses[`#${orderId}`]) {
-      orderStatuses[`#${orderId}`].status = 'rejected';
-      console.log('Bot rejected order:', `#${orderId}`);
-      await ctx.reply(`Заказ #${orderId} отклонен`);
+    if (orderStatuses[orderId]) {
+      orderStatuses[orderId].status = 'rejected';
+      console.log('Bot rejected order:', orderId, orderStatuses[orderId]);
+      await ctx.reply(`Заказ ${orderId} отклонен`);
     } else {
-      console.log('Order not found:', `#${orderId}`, 'Available orders:', Object.keys(orderStatuses));
-      await ctx.reply(`Заказ #${orderId} не найден. Доступные заказы: ${Object.keys(orderStatuses).join(', ')}`);
+      console.log('Order not found:', orderId, 'Available orders:', Object.keys(orderStatuses));
+      await ctx.reply(`Заказ ${orderId} не найден. Доступные заказы: ${Object.keys(orderStatuses).join(', ')}`);
     }
   } else {
     console.log('Missing orderId');
