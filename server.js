@@ -72,6 +72,17 @@ app.get('/status/:orderId', (req, res) => {
   res.status(200).json(status);
 });
 
+app.post('/update-status/:orderId', (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+  if (['approved', 'rejected'].includes(status)) {
+    orderStatuses[orderId] = { status };
+    res.status(200).json({ status });
+  } else {
+    res.status(400).json({ error: 'Неверный статус' });
+  }
+});
+
 // Запуск сервера
 app.listen(port, () => {
   console.log(`Сервер запущен на порту ${port}`);
