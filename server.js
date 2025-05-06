@@ -65,7 +65,7 @@ ${itemList}
 
     // Отправка фото, если есть
     if (photo) {
-      console.log('Sending photo to Telegram');
+      console.log('Sending photo to Telegram for order:', id);
       const buffer = Buffer.from(photo.split(',')[1], 'base64');
       await bot.telegram.sendPhoto(chatId, { source: buffer }, { caption: `Фото оплаты для заказа ${id}` }).catch(err => {
         console.error('Error sending photo:', err);
@@ -74,7 +74,7 @@ ${itemList}
     }
 
     // Сохранение статуса заказа
-    orderStatuses[id] = { status: 'pending' };
+    orderStatuses[id] = { status: 'pending', data: { firstName, lastName, passport, phone, discord, amount, items } };
     console.log('Order status saved:', id, orderStatuses[id]);
 
     res.status(200).json({ orderId: id });
@@ -92,6 +92,12 @@ app.get('/status/:orderId', (req, res) => {
   res.status(200).json(status);
 });
 
+// Эндпоинт для получения всех заказов (для диагностики)
+app.get('/orders', (req, res) => {
+  console.log('Fetching all orders:', Object.keys(orderStatuses));
+  res.status(200).json(orderStatuses);
+});
+
 // Эндпоинт для обновления статуса заказа
 app.post('/update-status/:orderId', (req, res) => {
   const { orderId } = req.params;
@@ -99,7 +105,7 @@ app.post('/update-status/:orderId', (req, res) => {
   console.log('Updating status for:', orderId, status);
 
   if (['approved', 'rejected'].includes(status)) {
-    orderStatuses[orderId] = { status };
+    orderStatuses[orderId] = { ...orderStatuses[orderId], status };
     console.log('Status updated:', orderId, orderStatuses[orderId]);
     res.status(200).json({ status });
   } else {
@@ -118,14 +124,21 @@ bot.command('approve', async (ctx) => {
     return;
   }
 
-  const orderId = ctx.message.text.split(' ')[1];
-  if (orderId && orderStatuses[orderId]) {
-    orderStatuses[orderId] = { status: 'approved' };
-    console.log('Bot approved order:', orderId);
-    await ctx.reply(`Заказ ${orderId} подтвержден`);
+  let orderId = ctx.message.text.split(' ')[1];
+  if (orderId) {
+    orderId = orderId.trim().replace(/^#/, ''); // Удаляем # и пробелы
+    console.log('Parsed orderId:', orderId);
+    if (orderStatuses[`#${orderId}`]) {
+      orderStatuses[`#${orderId}`].status = 'approved';
+      console.log('Bot approved order:', `#${orderId}`);
+      await ctx.reply(`Заказ #${orderId} подтвержден`);
+    } else {
+      console.log('Order not found:', `#${orderId}`, 'Available orders:', Object.keys(orderStatuses));
+      await ctx.reply(`Заказ #${orderId} не найден. Доступные заказы: ${Object.keys(orderStatuses).join(', ')}`);
+    }
   } else {
-    console.log('Invalid or missing orderId:', orderId);
-    await ctx.reply('Укажите действительный ID заказа, например: /approve #1234');
+    console.log('Missing orderId');
+    await ctx.reply('Укажите ID заказа, например: /approve #1234');
   }
 });
 
@@ -138,14 +151,21 @@ bot.command('reject', async (ctx) => {
     return;
   }
 
-  const orderId = ctx.message.text.split(' ')[1];
-  if (orderId && orderStatuses[orderId]) {
-    orderStatuses[orderId] = { status: 'rejected' };
-    console.log('Bot rejected order:', orderId);
-    await ctx.reply(`Заказ ${orderId} отклонен`);
+  let orderId = ctx.message.text.split(' ')[1];
+  if (orderId) {
+    orderId = orderId.trim().replace(/^#/, ''); // Удаляем # и пробелы
+    console.log('Parsed orderId:', orderId);
+    if (orderStatuses[`#${orderId}`]) {
+      orderStatuses[`#${orderId}`].status = 'rejected';
+      console.log('Bot rejected order:', `#${orderId}`);
+      await ctx.reply(`Заказ #${orderId} отклонен`);
+    } else {
+      console.log('Order not found:', `#${orderId}`, 'Available orders:', Object.keys(orderStatuses));
+      await ctx.reply(`Заказ #${orderId} не найден. Доступные заказы: ${Object.keys(orderStatuses).join(', ')}`);
+    }
   } else {
-    console.log('Invalid or missing orderId:', orderId);
-    await ctx.reply('Укажите действительный ID заказа, например: /reject #1234');
+    console.log('Missing orderId');
+    await ctx.reply('Укажите ID заказа, например: /reject #1234');
   }
 });
 
