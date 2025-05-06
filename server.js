@@ -14,7 +14,7 @@ const chatId = process.env.TELEGRAM_CHAT_ID || '';
 const bot = new Telegraf(botToken);
 
 // Список администраторов Telegram (их user ID)
-const adminIds = [123456789, 987654321]; // Замените на реальные user ID администраторов
+const adminIds = [729406890]; // Замените на реальные user ID администраторов
 
 // Хранилище статусов заказов
 const orderStatuses = {};
