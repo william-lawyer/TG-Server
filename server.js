@@ -14,7 +14,7 @@ const chatId = process.env.TELEGRAM_CHAT_ID || '';
 const bot = new Telegraf(botToken);
 
 // Список администраторов Telegram (их user ID)
-const adminIds = [729406890]; // Замените на реальные user ID администраторов
+const adminIds = [123456789, 987654321]; // Замените на реальные user ID администраторов
 
 // Хранилище статусов заказов
 const orderStatuses = {};
@@ -87,9 +87,15 @@ ${itemList}
 // Эндпоинт для проверки статуса заказа
 app.get('/status/:orderId', (req, res) => {
   const { orderId } = req.params;
-  const status = orderStatuses[orderId] || { status: 'pending' };
-  console.log('Status check for:', orderId, status);
-  res.status(200).json(status);
+  console.log('Status check requested for:', orderId);
+  const status = orderStatuses[orderId];
+  if (status) {
+    console.log('Returning status:', status);
+    res.status(200).json(status);
+  } else {
+    console.log('Order not found:', orderId);
+    res.status(404).json({ status: 'pending', error: 'Order not found' });
+  }
 });
 
 // Эндпоинт для получения всех заказов (для диагностики)
