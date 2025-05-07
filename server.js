@@ -6,25 +6,19 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Настройка middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Настройка Telegram-бота
 const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
 const chatId = process.env.TELEGRAM_CHAT_ID || '';
 const bot = new Telegraf(botToken);
 
-// Список администраторов Telegram (их user ID)
-const adminIds = [729406890]; // Замените на реальные user ID администраторов
+const adminIds = [729406890]; 
 
-// Путь к файлу для сохранения заказов
 const ordersFilePath = path.join(__dirname, 'orders.json');
 
-// Хранилище статусов заказов
 let orderStatuses = {};
 
-// Загрузка заказов из файла при старте
 async function loadOrders() {
   try {
     const data = await fs.readFile(ordersFilePath, 'utf8');
@@ -39,7 +33,6 @@ async function loadOrders() {
   }
 }
 
-// Сохранение заказов в файл
 async function saveOrders() {
   try {
     await fs.writeFile(ordersFilePath, JSON.stringify(orderStatuses, null, 2));
@@ -49,15 +42,12 @@ async function saveOrders() {
   }
 }
 
-// Логирование для диагностики
 console.log('Starting server...');
 console.log('Bot token:', botToken ? 'Set' : 'Not set');
 console.log('Chat ID:', chatId ? 'Set' : 'Not set');
 
-// Загрузка заказов при старте
 loadOrders();
 
-// Эндпоинт для получения заказа
 app.post('/order', async (req, res) => {
   try {
     const {
@@ -75,13 +65,11 @@ app.post('/order', async (req, res) => {
 
     console.log('Received order:', { id, firstName, lastName, passport, phone, discord, amount, items });
 
-    // Проверка валидности ID заказа
     if (!id || !id.startsWith('#') || id.length !== 5) {
       console.error('Invalid order ID:', id);
       return res.status(400).json({ error: 'Неверный формат ID заказа, ожидается #XXXX' });
     }
 
-    // Формирование сообщения для Telegram
     const itemList = items.map(item => `${item.name} - ${item.price} ₽ x ${item.quantity}`).join('\n');
     const message = `
 📋 Новый заказ ${id}
@@ -95,17 +83,14 @@ app.post('/order', async (req, res) => {
 ${itemList}
     `;
 
-    // Отправка сообщения в Telegram
     try {
       console.log('Sending message to Telegram:', message);
       await bot.telegram.sendMessage(chatId, message);
       console.log('Message sent to Telegram');
     } catch (error) {
       console.error('Error sending message to Telegram:', error);
-      // Ошибка Telegram не прерывает сохранение заказа
     }
 
-    // Отправка фото, если есть
     if (photo) {
       try {
         console.log('Sending photo to Telegram for order:', id);
@@ -114,16 +99,13 @@ ${itemList}
         console.log('Photo sent to Telegram');
       } catch (error) {
         console.error('Error sending photo to Telegram:', error);
-        // Ошибка Telegram не прерывает сохранение заказа
       }
     }
 
-    // Сохранение статуса заказа
     orderStatuses[id] = { status: 'pending', data: { firstName, lastName, passport, phone, discord, amount, items } };
     console.log('Order status saved:', id, orderStatuses[id]);
     console.log('Current orderStatuses:', Object.keys(orderStatuses));
 
-    // Сохранение в файл
     await saveOrders();
 
     res.status(200).json({ orderId: id });
@@ -133,7 +115,6 @@ ${itemList}
   }
 });
 
-// Эндпоинт для проверки статуса заказа
 app.get('/status/:orderId', (req, res) => {
   const { orderId } = req.params;
   console.log('Status check requested for:', orderId);
@@ -147,13 +128,11 @@ app.get('/status/:orderId', (req, res) => {
   }
 });
 
-// Эндпоинт для получения всех заказов (для диагностики)
 app.get('/orders', (req, res) => {
   console.log('Fetching all orders:', Object.keys(orderStatuses));
   res.status(200).json(orderStatuses);
 });
 
-// Эндпоинт для обновления статуса заказа
 app.post('/update-status/:orderId', (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
@@ -175,7 +154,6 @@ app.post('/update-status/:orderId', (req, res) => {
   }
 });
 
-// Telegram-бот: команды для управления статусами
 bot.command('approve', async (ctx) => {
   const userId = ctx.from.id;
   console.log('Approve command from:', userId);
@@ -187,7 +165,6 @@ bot.command('approve', async (ctx) => {
 
   let orderId = ctx.message.text.split(' ')[1]?.trim();
   if (orderId) {
-    // Нормализация ID
     if (!orderId.startsWith('#')) {
       orderId = `#${orderId.padStart(4, '0')}`;
     }
@@ -218,7 +195,6 @@ bot.command('reject', async (ctx) => {
 
   let orderId = ctx.message.text.split(' ')[1]?.trim();
   if (orderId) {
-    // Нормализация ID
     if (!orderId.startsWith('#')) {
       orderId = `#${orderId.padStart(4, '0')}`;
     }
@@ -238,19 +214,16 @@ bot.command('reject', async (ctx) => {
   }
 });
 
-// Запуск сервера
 app.listen(port, () => {
   console.log(`Сервер запущен на порту ${port}`);
 });
 
-// Запуск бота
 bot.launch().then(() => {
   console.log('Telegram-бот запущен');
 }).catch(err => {
   console.error('Ошибка запуска бота:', err);
 });
 
-// Обработка graceful shutdown
 process.on('SIGINT', async () => {
   await saveOrders();
   bot.stop('SIGINT');
